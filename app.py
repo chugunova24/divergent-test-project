@@ -17,13 +17,13 @@ def read_json_file(filename: str) -> dict:
     """
     path_to_file = PATH_JSONFILES + f"/{filename}"
 
-    if os.path.getsize(path_to_file) == 0:
+    try:
+        with open(path_to_file,
+                  "r",
+                  encoding="utf-8") as json_posts:
+            result = json.load(json_posts)
+    except FileNotFoundError:
         return {}
-
-    with open(path_to_file,
-              "r",
-              encoding="utf-8") as json_posts:
-        result = json.load(json_posts)
 
     return result
 
@@ -75,7 +75,12 @@ def get_posts():
         post_id = str(post["id"])
         post["comments_count"] = int(counter.get(post_id, 0))
 
-    return jsonify(posts)
+    posts = posts["posts"]
+
+    return jsonify({
+        "posts": posts,
+        "total_results": len(posts)
+    })
 
 
 @app.route("/posts/<int:post_id>")
