@@ -1,7 +1,31 @@
+import os
+
 from flask import Flask, jsonify, abort
 from typing import Tuple
+import json
 
 app = Flask(__name__)
+app.config['JSON_SORT_KEYS'] = False
+app.config['JSON_AS_ASCII'] = False
+
+PATH_JSONFILES = "data"
+
+
+def read_json_file(filename: str) -> dict:
+    """
+    Чтение из json-файла и запись в словарь
+    """
+    path_to_file = PATH_JSONFILES + f"/{filename}"
+
+    if os.path.getsize(path_to_file) == 0:
+        return {}
+
+    with open(path_to_file,
+              "r",
+              encoding="utf-8") as json_posts:
+        result = json.load(json_posts)
+
+    return result
 
 
 def data_loader() -> Tuple[dict, dict]:
@@ -9,7 +33,10 @@ def data_loader() -> Tuple[dict, dict]:
     Функция загружает данные из json файлов и преобразует их в dict.
     Функция не должна нарушать изначальную структуру данных.
     """
-    return {}, {}
+    posts = read_json_file(filename="posts.json")
+    comments = read_json_file(filename="comments.json")
+
+    return posts, comments
 
 
 @app.route("/")
@@ -35,9 +62,20 @@ def get_posts():
     Порядок ключей словаря в ответе не важен
     """
     posts, comments = data_loader()
-    output = {"body": "Social posts"}
+    counter = {}
 
-    return jsonify(output)
+    for comment in comments.get("comments", {}):
+        post_id = str(comment["post_id"])
+        if post_id in counter:
+            counter[post_id] += 1
+        else:
+            counter[post_id] = 1
+
+    for post in posts.get("posts", {}):
+        post_id = str(post["id"])
+        post["comments_count"] = int(counter.get(post_id, 0))
+
+    return jsonify(posts)
 
 
 @app.route("/posts/<int:post_id>")
@@ -66,6 +104,18 @@ def get_post(post_id):
     Порядок ключей словаря в ответе не важен
     """
     posts, comments = data_loader()
-    output = {"body": "Post: %d" % post_id}
+    output = {}
+
+    for post in posts["posts"]:
+        if post["id"] == post_id:
+            output.update(post)
+            break
+    if not output:
+        return abort(404)
+
+    output["comments"] = []
+    for comment in comments["comments"]:
+        if comment["post_id"] == post_id:
+            output["comments"].append(comment)
 
     return jsonify(output)
